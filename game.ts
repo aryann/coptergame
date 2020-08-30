@@ -11,8 +11,8 @@ class Point {
 }
 
 class Dimensions {
-    readonly width: number;
-    readonly height: number;
+    public readonly width: number;
+    public readonly height: number;
 
     constructor(width: number, height: number) {
         this.width = width;
@@ -31,6 +31,7 @@ class Rectangle {
 }
 
 interface Frame {
+    clear(): void
     drawRect(position: Point, dimensions: Dimensions): void
 }
 
@@ -38,30 +39,60 @@ interface FrameFactory {
     newFrame(offset: number): Frame;
 }
 
-class HTMLCanvasFrame {
-    private readonly canvas: CanvasRenderingContext2D;
+class HTMLCanvasFrame implements Frame {
+    private readonly canvas: HTMLCanvasElement;
+    private readonly canvasContext: CanvasRenderingContext2D;
     private readonly offset: number;
 
-    constructor(canvas: CanvasRenderingContext2D, offset: number) {
+    constructor(canvas: HTMLCanvasElement, offset: number) {
         this.canvas = canvas;
+        this.canvasContext = canvas.getContext("2d") as CanvasRenderingContext2D;
         this.offset = offset;
     }
 
+    clear(): void {
+        this.canvasContext.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    }
+
     drawRect(position: Point, dimensions: Dimensions): void {
-        this.canvas.fillStyle = "#cccccc";
-        this.canvas.fillRect(position.x, position.y, dimensions.width, dimensions.height);
+        this.canvasContext.fillStyle = "#cccccc";
+        this.canvasContext.fillRect(position.x - this.offset, position.y, dimensions.width, dimensions.height);
     }
 }
 
 class HTMLCanvasFrameFactory {
-    private readonly canvas: CanvasRenderingContext2D;
+    private readonly canvas: HTMLCanvasElement;
 
-    constructor(canvas: CanvasRenderingContext2D) {
+    constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas;
     }
 
     newFrame(offset: number): Frame {
         return new HTMLCanvasFrame(this.canvas, offset);
+    }
+}
+
+interface HelicopterController {
+    goUp(): boolean;
+}
+
+class HTMLCanvasHelicopterController implements HelicopterController {
+    private readonly canvas: HTMLCanvasElement;
+
+    private mouseDown: boolean;
+
+    constructor(canvas: HTMLCanvasElement) {
+        this.canvas = canvas;
+        this.canvas.addEventListener("mousedown", _ => {
+            this.mouseDown = true;
+        });
+        this.canvas.addEventListener("mouseup", _ => {
+            this.mouseDown = false;
+        });
+    }
+
+    goUp(): boolean {
+        return this.mouseDown;
     }
 }
 
@@ -71,9 +102,27 @@ interface GameObject {
 }
 
 class Helicopter implements GameObject {
-    constructor() { }
+    private readonly helicopterController: HelicopterController;
+    private position: Point;
 
-    draw(frame: Frame): void { }
+    constructor(start: Point, helicopterController: HelicopterController) {
+        this.position = start;
+        this.helicopterController = helicopterController;
+    }
+
+    advance(offset: number): void {
+        let newY = this.position.y;
+        if (this.helicopterController.goUp()) {
+            newY -= 1;
+        } else {
+            newY += 1;
+        }
+        this.position = new Point(this.position.x + offset, newY);
+    }
+
+    draw(frame: Frame): void {
+        frame.drawRect(this.position, new Dimensions(20, 20));
+    }
 
     boundingBox() {
         return new Rectangle(new Point(0, 0), new Point(0, 0));
@@ -102,24 +151,30 @@ class Obstacle implements GameObject {
 
 class Game {
     private frameFactory: FrameFactory;
+    private dimensions: Dimensions;
     private offset: number;
     private obstables: Obstacle[];
     private helictoper: Helicopter;
 
-    constructor(frameFactory: FrameFactory) {
+    constructor(frameFactory: FrameFactory, dimensions: Dimensions, helicopterController: HelicopterController) {
         this.offset = 0;
         this.frameFactory = frameFactory;
+        this.dimensions = dimensions;
         this.obstables = [];
+        this.helictoper = new Helicopter(new Point(this.dimensions.width / 2, this.dimensions.height / 2), helicopterController);
     }
 
     tick() {
-        this.offset += 1;
+        this.offset += 2;
+        this.helictoper.advance(2);
         this.generateNewObstacles();
-        this.helictoper = new Helicopter();
+
+        // TODO: Remove obstacles that are no longer visible.
     }
 
     draw() {
-        const frame: Frame = frameFactory.newFrame(this.offset);
+        const frame: Frame = this.frameFactory.newFrame(this.offset);
+        frame.clear();
 
         let allObjects: GameObject[] = [this.helictoper];
         allObjects = allObjects.concat(this.obstables);
@@ -129,23 +184,29 @@ class Game {
     }
 
     private generateNewObstacles(): void {
+        if (this.offset % 400 != 0) {
+            return;
+        }
+
         for (let i = 0; i < 1; i++) {
             this.obstables.push(new Obstacle(
-                new Point(this.offset * 150, 0),
-                new Dimensions(100, 200),
+                new Point(this.dimensions.width + this.offset, Math.random() * (this.dimensions.height - 100)),
+                new Dimensions(50, 100),
             ));
         }
     }
 }
 
+const main = function () {
+    let canvas: HTMLCanvasElement = document.getElementById("game") as HTMLCanvasElement;
 
-let canvas: HTMLCanvasElement = document.getElementById("game") as HTMLCanvasElement;
-let context: CanvasRenderingContext2D = canvas.getContext("2d") as CanvasRenderingContext2D;
-let frameFactory: FrameFactory = new HTMLCanvasFrameFactory(context);
+    let frameFactory: FrameFactory = new HTMLCanvasFrameFactory(canvas);
 
-let game: Game = new Game(frameFactory);
-setInterval(function () {
-    game.tick();
-    game.draw();
-}, 100);
+    let game: Game = new Game(frameFactory, new Dimensions(canvas.width, canvas.height), new HTMLCanvasHelicopterController(canvas));
+    setInterval(function () {
+        game.tick();
+        game.draw();
+    }, 1);
+};
+main();
 
