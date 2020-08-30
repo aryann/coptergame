@@ -121,11 +121,14 @@ class Helicopter implements GameObject {
     }
 
     draw(frame: Frame): void {
+        // TODO: Make the size configurable.
         frame.drawRect(this.position, new Dimensions(20, 20));
     }
 
     boundingBox() {
-        return new Rectangle(new Point(0, 0), new Point(0, 0));
+        return new Rectangle(
+            this.position,
+            new Point(this.position.x + 20, this.position.y + 20));
     }
 
 }
@@ -145,7 +148,11 @@ class Obstacle implements GameObject {
     }
 
     boundingBox() {
-        return null;
+        return new Rectangle(
+            this.position,
+            new Point(
+                this.position.x + this.dimensions.width,
+                this.position.y + this.dimensions.height));
     }
 }
 
@@ -153,18 +160,18 @@ class Game {
     private frameFactory: FrameFactory;
     private dimensions: Dimensions;
     private offset: number;
-    private obstables: Obstacle[];
+    private obstacles: Obstacle[];
     private helictoper: Helicopter;
 
     constructor(frameFactory: FrameFactory, dimensions: Dimensions, helicopterController: HelicopterController) {
         this.offset = 0;
         this.frameFactory = frameFactory;
         this.dimensions = dimensions;
-        this.obstables = [];
+        this.obstacles = [];
         this.helictoper = new Helicopter(new Point(this.dimensions.width / 2, this.dimensions.height / 2), helicopterController);
     }
 
-    tick() {
+    tick(): void {
         this.offset += 2;
         this.helictoper.advance(2);
         this.generateNewObstacles();
@@ -172,12 +179,30 @@ class Game {
         // TODO: Remove obstacles that are no longer visible.
     }
 
-    draw() {
+    hasCollided(): boolean {
+        for (let obstacle of this.obstacles) {
+            if (this.collided(this.helictoper, obstacle)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private collided(o1: GameObject, o2: GameObject): boolean {
+        const a = o1.boundingBox();
+        const b = o2.boundingBox();
+        return a.from.x < b.to.x &&
+            a.to.x > b.from.x &&
+            a.from.y < b.to.y &&
+            a.to.y > b.from.y;
+    }
+
+    draw(): void {
         const frame: Frame = this.frameFactory.newFrame(this.offset);
         frame.clear();
 
         let allObjects: GameObject[] = [this.helictoper];
-        allObjects = allObjects.concat(this.obstables);
+        allObjects = allObjects.concat(this.obstacles);
         for (let gameObject of allObjects) {
             gameObject.draw(frame);
         }
@@ -189,7 +214,7 @@ class Game {
         }
 
         for (let i = 0; i < 1; i++) {
-            this.obstables.push(new Obstacle(
+            this.obstacles.push(new Obstacle(
                 new Point(this.dimensions.width + this.offset, Math.random() * (this.dimensions.height - 100)),
                 new Dimensions(50, 100),
             ));
@@ -206,6 +231,9 @@ const main = function () {
     setInterval(function () {
         game.tick();
         game.draw();
+        if (game.hasCollided()) {
+            console.log("collision detected");
+        }
     }, 1);
 };
 main();
