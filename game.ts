@@ -171,6 +171,7 @@ class Game {
     private frameFactory: FrameFactory;
     private dimensions: Dimensions;
     private offset: number;
+
     private obstacles: Obstacle[];
     private helictoper: Helicopter;
 
@@ -185,7 +186,11 @@ class Game {
     tick(): void {
         this.offset += 2;
         this.helictoper.advance(2);
-        this.generateNewObstacles();
+
+        if (this.offset % this.dimensions.width === 0) {
+            this.generateNewObstacles();
+            this.generateNewWalls();
+        }
 
         // TODO: Remove obstacles that are no longer visible.
     }
@@ -211,15 +216,27 @@ class Game {
     }
 
     private generateNewObstacles(): void {
-        if (this.offset % 400 != 0) {
-            return;
-        }
-
-        for (let i = 0; i < 1; i++) {
+        for (let i = 0; i < 2; i++) {
             this.obstacles.push(new Obstacle(
-                new Point(this.dimensions.width + this.offset, Math.random() * (this.dimensions.height - 100)),
+                new Point(
+                    this.dimensions.width + this.dimensions.width / 2 * i + this.offset,
+                    Math.random() * (this.dimensions.height - 100)),
                 new Dimensions(50, 100),
             ));
+        }
+    }
+
+    private generateNewWalls(): void {
+        let span = 0;
+        let height = this.dimensions.height - 50;
+
+        while (span < this.dimensions.width) {
+            height += 50 * (Math.random() - 0.5);
+            this.obstacles.push(new Obstacle(
+                new Point(span + this.dimensions.width + this.offset, height),
+                new Dimensions(200, 100),
+            ));
+            span += 100 * Math.random();
         }
     }
 }
