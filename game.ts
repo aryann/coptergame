@@ -96,16 +96,26 @@ class HTMLCanvasHelicopterController implements HelicopterController {
     }
 }
 
-interface GameObject {
-    draw(frame: Frame): void;
-    boundingBox(): Rectangle;
+abstract class GameObject {
+    abstract draw(frame: Frame): void;
+    abstract boundingBox(): Rectangle;
+
+    collidesWith(other: GameObject): boolean {
+        const a = this.boundingBox();
+        const b = other.boundingBox();
+        return a.from.x < b.to.x &&
+            a.to.x > b.from.x &&
+            a.from.y < b.to.y &&
+            a.to.y > b.from.y;
+    }
 }
 
-class Helicopter implements GameObject {
+class Helicopter extends GameObject {
     private readonly helicopterController: HelicopterController;
     private position: Point;
 
     constructor(start: Point, helicopterController: HelicopterController) {
+        super();
         this.position = start;
         this.helicopterController = helicopterController;
     }
@@ -133,11 +143,12 @@ class Helicopter implements GameObject {
 
 }
 
-class Obstacle implements GameObject {
+class Obstacle extends GameObject {
     private readonly position: Point;
     private readonly dimensions: Dimensions;
 
     constructor(position: Point, dimensions: Dimensions) {
+        super();
         this.position = position;
         this.dimensions = dimensions;
     }
@@ -181,20 +192,11 @@ class Game {
 
     hasCollided(): boolean {
         for (let obstacle of this.obstacles) {
-            if (this.collided(this.helictoper, obstacle)) {
+            if (this.helictoper.collidesWith(obstacle)) {
                 return true;
             }
         }
         return false;
-    }
-
-    private collided(o1: GameObject, o2: GameObject): boolean {
-        const a = o1.boundingBox();
-        const b = o2.boundingBox();
-        return a.from.x < b.to.x &&
-            a.to.x > b.from.x &&
-            a.from.y < b.to.y &&
-            a.to.y > b.from.y;
     }
 
     draw(): void {
@@ -228,11 +230,12 @@ const main = function () {
     let frameFactory: FrameFactory = new HTMLCanvasFrameFactory(canvas);
 
     let game: Game = new Game(frameFactory, new Dimensions(canvas.width, canvas.height), new HTMLCanvasHelicopterController(canvas));
-    setInterval(function () {
+    const timer = setInterval(function () {
         game.tick();
         game.draw();
         if (game.hasCollided()) {
-            console.log("collision detected");
+            clearInterval(timer);
+            console.log("Game over!");
         }
     }, 1);
 };
