@@ -156,7 +156,6 @@ class Obstacle extends GameObject {
 
     draw(frame: Frame): void {
         frame.drawRect(this.position, this.dimensions)
-
     }
 
     boundingBox() {
@@ -255,13 +254,10 @@ class Game {
             const to = this.offset + 2 * this.dimensions.width;
             this.obstacles.push(...this.obstacleGenerator.generateBorders(to));
             this.obstacles.push(...this.obstacleGenerator.generateObstacles(to));
-
+            this.removeOutOfFrameObstacles();
         }
-
         this.offset += 2;
         this.helicopter.advance(2);
-
-        // TODO: Remove obstacles that are no longer visible.
     }
 
     hasCollided(): boolean {
@@ -282,6 +278,15 @@ class Game {
         for (let gameObject of allObjects) {
             gameObject.draw(frame);
         }
+    }
+
+    private removeOutOfFrameObstacles(): void {
+        var i = 0;
+        while (i < this.obstacles.length &&
+            this.obstacles[i].boundingBox().to.x < this.offset) {
+            i++;
+        }
+        this.obstacles.splice(0, i);
     }
 }
 
