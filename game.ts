@@ -170,41 +170,62 @@ class Obstacle extends GameObject {
 
 interface ObstacleGenerator {
     generateBorders(to: number): Obstacle[]
+    generateObstacles(to: number): Obstacle[]
 }
 
 class ObstacleGeneratorImpl {
     private readonly dimensions: Dimensions;
+    private readonly initialGapSize: number;
+    private readonly minGapSize: number;
+
     private from: number;
     private gapSize: number;
-    private heightVariance: number;
     private heightVarianceDirection: number;
 
-    constructor(dimensions: Dimensions, initialGapSize: number) {
+    constructor(dimensions: Dimensions, initialGapSize: number, minGapSize: number) {
+        this.initialGapSize = initialGapSize;
         this.dimensions = dimensions;
+        this.minGapSize = minGapSize;
         this.from = 0;
         this.gapSize = initialGapSize;
-        this.heightVariance = 0;
         this.heightVarianceDirection = 1;
     }
 
     generateBorders(to: number): Obstacle[] {
         var obstacles: Obstacle[] = [];
         while (this.from < to) {
-            this.gapSize -= 1;
-            this.heightVarianceDirection *= Math.random() > 0.7 ? -1 : 1;
-            this.heightVariance += this.heightVarianceDirection * 10;
-            this.heightVariance = Math.max(this.heightVariance, 0);
-            console.log(this.heightVariance);
+            this.heightVarianceDirection *= Math.random() > 0.9 ? -1 : 1;
+            this.gapSize = Math.min(
+                this.initialGapSize,
+                Math.max(this.gapSize - this.heightVarianceDirection * 10, this.minGapSize),
+            );
+
             const obstacleHeight = (this.dimensions.height - this.gapSize) / 2;
             obstacles.push(new Obstacle(
                 new Point(this.from, 0),
-                new Dimensions(100, obstacleHeight + this.heightVariance)));
+                new Dimensions(100, obstacleHeight)));
             obstacles.push(new Obstacle(
-                new Point(this.from, this.dimensions.height - obstacleHeight + this.heightVariance),
+                new Point(this.from, this.dimensions.height - obstacleHeight),
                 new Dimensions(100, obstacleHeight)));
             this.from += 100;
         }
         return obstacles;
+    }
+
+    generateObstacles(to: number): Obstacle[] {
+        var obstacles: Obstacle[] = [];
+        var x = to - this.dimensions.width;
+        const obstaclesPerFrame = 2;
+        for (var i = 0; i < obstaclesPerFrame; i++) {
+            x += this.dimensions.width / obstaclesPerFrame;
+            obstacles.push(new Obstacle(
+                new Point(
+                    x,
+                    Math.random() * (this.dimensions.height - 100)),
+                new Dimensions(50, 100)));
+        }
+        return obstacles;
+
     }
 }
 
@@ -233,14 +254,12 @@ class Game {
         if (this.offset % this.dimensions.width == 0) {
             const to = this.offset + 2 * this.dimensions.width;
             this.obstacles.push(...this.obstacleGenerator.generateBorders(to));
+            this.obstacles.push(...this.obstacleGenerator.generateObstacles(to));
+
         }
 
         this.offset += 2;
         this.helicopter.advance(2);
-
-        if (this.offset % this.dimensions.width === 0) {
-            this.generateNewObstacles();
-        }
 
         // TODO: Remove obstacles that are no longer visible.
     }
@@ -264,17 +283,6 @@ class Game {
             gameObject.draw(frame);
         }
     }
-
-    private generateNewObstacles(): void {
-        for (let i = 0; i < 2; i++) {
-            this.obstacles.push(new Obstacle(
-                new Point(
-                    this.dimensions.width + this.dimensions.width / 2 * i + this.offset,
-                    Math.random() * (this.dimensions.height - 100)),
-                new Dimensions(50, 100),
-            ));
-        }
-    }
 }
 
 const main = function () {
@@ -285,7 +293,7 @@ const main = function () {
 
     let game: Game = new Game(
         frameFactory,
-        new ObstacleGeneratorImpl(dimensions, dimensions.height * 0.9),
+        new ObstacleGeneratorImpl(dimensions, dimensions.height * 0.9, dimensions.height * 0.5),
         dimensions,
         new HTMLCanvasHelicopterController(canvas));
     const timer = setInterval(function () {
