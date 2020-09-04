@@ -82,6 +82,7 @@ class HTMLCanvasHelicopterController implements HelicopterController {
     private mouseDown: boolean;
 
     constructor(canvas: HTMLCanvasElement) {
+        this.mouseDown = false;
         this.canvas = canvas;
         this.canvas.addEventListener("mousedown", _ => {
             this.mouseDown = true;
@@ -167,29 +168,78 @@ class Obstacle extends GameObject {
     }
 }
 
+interface ObstacleGenerator {
+    generateBorders(to: number): Obstacle[]
+}
+
+class ObstacleGeneratorImpl {
+    private readonly dimensions: Dimensions;
+    private from: number;
+    private gapSize: number;
+    private heightVariance: number;
+    private heightVarianceDirection: number;
+
+    constructor(dimensions: Dimensions, initialGapSize: number) {
+        this.dimensions = dimensions;
+        this.from = 0;
+        this.gapSize = initialGapSize;
+        this.heightVariance = 0;
+        this.heightVarianceDirection = 1;
+    }
+
+    generateBorders(to: number): Obstacle[] {
+        var obstacles: Obstacle[] = [];
+        while (this.from < to) {
+            this.gapSize -= 1;
+            this.heightVarianceDirection *= Math.random() > 0.7 ? -1 : 1;
+            this.heightVariance += this.heightVarianceDirection * 10;
+            this.heightVariance = Math.max(this.heightVariance, 0);
+            console.log(this.heightVariance);
+            const obstacleHeight = (this.dimensions.height - this.gapSize) / 2;
+            obstacles.push(new Obstacle(
+                new Point(this.from, 0),
+                new Dimensions(100, obstacleHeight + this.heightVariance)));
+            obstacles.push(new Obstacle(
+                new Point(this.from, this.dimensions.height - obstacleHeight + this.heightVariance),
+                new Dimensions(100, obstacleHeight)));
+            this.from += 100;
+        }
+        return obstacles;
+    }
+}
+
 class Game {
     private frameFactory: FrameFactory;
+    private obstacleGenerator: ObstacleGenerator;
+
     private dimensions: Dimensions;
     private offset: number;
+    private obstacleHighWatermark: number;
 
     private obstacles: Obstacle[];
-    private helictoper: Helicopter;
+    private helicopter: Helicopter;
 
-    constructor(frameFactory: FrameFactory, dimensions: Dimensions, helicopterController: HelicopterController) {
-        this.offset = 0;
+    constructor(frameFactory: FrameFactory, obstacleGenerator: ObstacleGenerator, dimensions: Dimensions, helicopterController: HelicopterController) {
         this.frameFactory = frameFactory;
+        this.obstacleGenerator = obstacleGenerator;
         this.dimensions = dimensions;
-        this.obstacles = [];
-        this.helictoper = new Helicopter(new Point(this.dimensions.width / 2, this.dimensions.height / 2), helicopterController);
+        this.offset = 0;
+        this.obstacleHighWatermark = this.dimensions.width;
+        this.obstacles = obstacleGenerator.generateBorders(dimensions.width);
+        this.helicopter = new Helicopter(new Point(this.dimensions.width / 2, this.dimensions.height / 2), helicopterController);
     }
 
     tick(): void {
+        if (this.offset % this.dimensions.width == 0) {
+            const to = this.offset + 2 * this.dimensions.width;
+            this.obstacles.push(...this.obstacleGenerator.generateBorders(to));
+        }
+
         this.offset += 2;
-        this.helictoper.advance(2);
+        this.helicopter.advance(2);
 
         if (this.offset % this.dimensions.width === 0) {
             this.generateNewObstacles();
-            this.generateNewWalls();
         }
 
         // TODO: Remove obstacles that are no longer visible.
@@ -197,7 +247,7 @@ class Game {
 
     hasCollided(): boolean {
         for (let obstacle of this.obstacles) {
-            if (this.helictoper.collidesWith(obstacle)) {
+            if (this.helicopter.collidesWith(obstacle)) {
                 return true;
             }
         }
@@ -208,7 +258,7 @@ class Game {
         const frame: Frame = this.frameFactory.newFrame(this.offset);
         frame.clear();
 
-        let allObjects: GameObject[] = [this.helictoper];
+        let allObjects: GameObject[] = [this.helicopter];
         allObjects = allObjects.concat(this.obstacles);
         for (let gameObject of allObjects) {
             gameObject.draw(frame);
@@ -225,28 +275,19 @@ class Game {
             ));
         }
     }
-
-    private generateNewWalls(): void {
-        let span = 0;
-        let height = this.dimensions.height - 50;
-
-        while (span < this.dimensions.width) {
-            height += 50 * (Math.random() - 0.5);
-            this.obstacles.push(new Obstacle(
-                new Point(span + this.dimensions.width + this.offset, height),
-                new Dimensions(200, 100),
-            ));
-            span += 100 * Math.random();
-        }
-    }
 }
 
 const main = function () {
     let canvas: HTMLCanvasElement = document.getElementById("game") as HTMLCanvasElement;
 
     let frameFactory: FrameFactory = new HTMLCanvasFrameFactory(canvas);
+    const dimensions: Dimensions = new Dimensions(canvas.width, canvas.height);
 
-    let game: Game = new Game(frameFactory, new Dimensions(canvas.width, canvas.height), new HTMLCanvasHelicopterController(canvas));
+    let game: Game = new Game(
+        frameFactory,
+        new ObstacleGeneratorImpl(dimensions, dimensions.height * 0.9),
+        dimensions,
+        new HTMLCanvasHelicopterController(canvas));
     const timer = setInterval(function () {
         game.tick();
         game.draw();
