@@ -32,7 +32,7 @@ class Rectangle {
 
 interface Frame {
     clear(): void
-    drawRect(position: Point, dimensions: Dimensions): void
+    drawRect(position: Point, dimensions: Dimensions, color: string): void
 }
 
 interface FrameFactory {
@@ -54,8 +54,8 @@ class HTMLCanvasFrame implements Frame {
         this.canvasContext.clearRect(0, 0, this.canvas.width, this.canvas.height);
     }
 
-    drawRect(position: Point, dimensions: Dimensions): void {
-        this.canvasContext.fillStyle = "#cccccc";
+    drawRect(position: Point, dimensions: Dimensions, color: string): void {
+        this.canvasContext.fillStyle = color;
         this.canvasContext.fillRect(position.x - this.offset, position.y, dimensions.width, dimensions.height);
     }
 }
@@ -114,10 +114,12 @@ abstract class GameObject {
 class Helicopter extends GameObject {
     private readonly helicopterController: HelicopterController;
     private position: Point;
+    private trail: Point[];
 
     constructor(start: Point, helicopterController: HelicopterController) {
         super();
         this.position = start;
+        this.trail = [];
         this.helicopterController = helicopterController;
     }
 
@@ -128,12 +130,16 @@ class Helicopter extends GameObject {
         } else {
             newY += 1;
         }
+        this.trail.push(this.position);
         this.position = new Point(this.position.x + offset, newY);
     }
 
     draw(frame: Frame): void {
         // TODO: Make the size configurable.
-        frame.drawRect(this.position, new Dimensions(20, 20));
+        for (let point of this.trail) {
+            frame.drawRect(point, new Dimensions(20, 20), "#eee");
+        }
+        frame.drawRect(this.position, new Dimensions(20, 20), "#ccc");
     }
 
     boundingBox() {
@@ -155,7 +161,7 @@ class Obstacle extends GameObject {
     }
 
     draw(frame: Frame): void {
-        frame.drawRect(this.position, this.dimensions)
+        frame.drawRect(this.position, this.dimensions, "#ccc")
     }
 
     boundingBox() {
