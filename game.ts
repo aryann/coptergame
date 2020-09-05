@@ -280,6 +280,10 @@ class Game {
         }
     }
 
+    score(): number {
+        return this.offset / 2;
+    }
+
     private removeOutOfFrameObstacles(): void {
         var i = 0;
         while (i < this.obstacles.length &&
@@ -291,9 +295,10 @@ class Game {
 }
 
 const main = function () {
-    let canvas: HTMLCanvasElement = document.getElementById("game") as HTMLCanvasElement;
+    const canvas: HTMLCanvasElement = document.getElementById("game") as HTMLCanvasElement;
+    const score: HTMLSpanElement = document.getElementById("score") as HTMLSpanElement;
 
-    let frameFactory: FrameFactory = new HTMLCanvasFrameFactory(canvas);
+    const frameFactory: FrameFactory = new HTMLCanvasFrameFactory(canvas);
     const dimensions: Dimensions = new Dimensions(canvas.width, canvas.height);
 
     let game: Game = new Game(
@@ -302,6 +307,7 @@ const main = function () {
         dimensions,
         new HTMLCanvasHelicopterController(canvas));
     const timer = setInterval(function () {
+        score.innerText = game.score().toString();
         game.tick();
         game.draw();
         if (game.hasCollided()) {
