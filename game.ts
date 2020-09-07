@@ -33,6 +33,8 @@ class Rectangle {
 interface Frame {
     clear(): void
     drawRect(position: Point, dimensions: Dimensions, color: string): void
+    drawImage(postition: Point, dimensions: Dimensions, image: HTMLImageElement): void
+    writeText(position: Point, text: string): void
 }
 
 interface FrameFactory {
@@ -56,7 +58,20 @@ class HTMLCanvasFrame implements Frame {
 
     drawRect(position: Point, dimensions: Dimensions, color: string): void {
         this.canvasContext.fillStyle = color;
-        this.canvasContext.fillRect(position.x - this.offset, position.y, dimensions.width, dimensions.height);
+        this.canvasContext.fillRect(
+            position.x - this.offset, position.y, dimensions.width, dimensions.height);
+    }
+
+    drawImage(postition: Point, dimensions: Dimensions, image: HTMLImageElement): void {
+        this.canvasContext.drawImage(
+            image, postition.x - this.offset, postition.y, dimensions.width, dimensions.height);
+    }
+
+    writeText(position: Point, text: string): void {
+        this.canvasContext.fillStyle = "white";
+        this.canvasContext.font = "40px Arial";
+        this.canvasContext.textAlign = "center";
+        this.canvasContext.fillText(text, position.x, position.y);
     }
 }
 
@@ -245,14 +260,14 @@ class Game {
     private obstacles: Obstacle[];
     private helicopter: Helicopter;
 
-    constructor(frameFactory: FrameFactory, obstacleGenerator: ObstacleGenerator, dimensions: Dimensions, helicopterController: HelicopterController) {
+    constructor(frameFactory: FrameFactory, obstacleGenerator: ObstacleGenerator, dimensions: Dimensions, helicopter: Helicopter) {
         this.frameFactory = frameFactory;
         this.obstacleGenerator = obstacleGenerator;
         this.dimensions = dimensions;
         this.offset = 0;
         this.obstacleHighWatermark = this.dimensions.width;
         this.obstacles = obstacleGenerator.generateBorders(dimensions.width);
-        this.helicopter = new Helicopter(new Point(this.dimensions.width / 2, this.dimensions.height / 2), helicopterController);
+        this.helicopter = helicopter;
     }
 
     tick(): void {
@@ -303,22 +318,29 @@ class Game {
 const main = function () {
     const canvas: HTMLCanvasElement = document.getElementById("game") as HTMLCanvasElement;
     const score: HTMLSpanElement = document.getElementById("score") as HTMLSpanElement;
+    const cat: HTMLImageElement = document.getElementById("cat") as HTMLImageElement;
 
     const frameFactory: FrameFactory = new HTMLCanvasFrameFactory(canvas);
     const dimensions: Dimensions = new Dimensions(canvas.width, canvas.height);
+    const helicopter = new Helicopter(
+        new Point(dimensions.width / 2, dimensions.height / 2),
+        new HTMLCanvasHelicopterController(canvas));
 
     let game: Game = new Game(
         frameFactory,
         new ObstacleGeneratorImpl(dimensions, dimensions.height * 0.9, dimensions.height * 0.5),
         dimensions,
-        new HTMLCanvasHelicopterController(canvas));
+        helicopter);
     const timer = setInterval(function () {
         score.innerText = game.score().toString();
         game.tick();
         game.draw();
         if (game.hasCollided()) {
             clearInterval(timer);
-            console.log("Game over!");
+            const frame = frameFactory.newFrame(0);
+            frame.drawImage(
+                new Point(dimensions.width / 2 - dimensions.height / 2, 0), new Dimensions(dimensions.height, dimensions.height), cat);
+            frame.writeText(new Point(dimensions.width / 2, 80), "I'm so disappointed in you.");
         }
     }, 1);
 };
